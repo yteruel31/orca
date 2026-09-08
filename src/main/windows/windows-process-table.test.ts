@@ -481,6 +481,23 @@ describe('PowerShell fallback when the native binding is absent', () => {
     expect(cimScan).not.toHaveBeenCalled()
   })
 
+  it('says so in the log, once, rather than falling back silently', async () => {
+    // #16905 was this path running as the daemon's steady state with nothing to
+    // notice it. Absence is legitimate on a relay; being quiet about it is not.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    __setWindowsProcessTreeLoaderForTests(() => null)
+
+    await readWindowsProcessTableFresh()
+    await readWindowsProcessTableFresh()
+
+    expect(
+      warn.mock.calls.filter((call) =>
+        String(call[0]).includes('falling back to a powershell.exe CIM scan')
+      )
+    ).toHaveLength(1)
+    warn.mockRestore()
+  })
+
   it('rejects a scan missing our own pid instead of reporting an idle machine', async () => {
     __setWindowsProcessTreeLoaderForTests(() => null)
     cimScan.mockResolvedValue([{ pid: 200, ppid: 4, name: 'claude.exe', command: 'claude' }])
